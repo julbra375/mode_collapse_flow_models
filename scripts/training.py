@@ -154,7 +154,7 @@ def train_CNF_parallel(models, sample_dataset_fn, loss_fn, optimizer, key,
     return models, losses_history, weights_history, ranks_history, grads_history
 
 
-def compute_analytic_grads_tree(model, initial_modes, target_modes, key, num_samples=10000):
+def compute_analytic_grads_tree(model, initial_modes, target_modes, weights, key, num_samples=10000):
     """
     Computes the analytic gradient for the weight matrix and returns a PyTree 
     of gradients matching the model structure.
@@ -164,7 +164,7 @@ def compute_analytic_grads_tree(model, initial_modes, target_modes, key, num_sam
     
     # 2. Compute the analytic gradient matrix
     raw_grad_W = compute_analytic_gradient_Mmodes(
-        W, initial_modes, target_modes, key, num_samples
+        W, initial_modes, target_modes, weights, key, num_samples
     )
 
     # 3. Create a PyTree of zeros matching the model structure
@@ -246,6 +246,7 @@ def train_CNF_analytic_parallel(
     models, 
     initial_modes_batch, 
     target_modes_batch, 
+    weights_batch,
     optimizer, 
     key, 
     calc_rank_parallel=None, 
@@ -282,7 +283,7 @@ def train_CNF_analytic_parallel(
     rank_history = []
 
     # --- Define Single Analytic Step ---
-    def train_step_analytic(model, opt_state, step_key, init_modes, targ_modes):
+    def train_step_analytic(model, opt_state, step_key, init_modes, targ_modes, weights):
         """
         Performs one analytic update step for a single model.
         This function will be vmapped below.
@@ -290,7 +291,7 @@ def train_CNF_analytic_parallel(
         # 1. Compute Gradients Analytically using your provided function
         # Note: We rely on compute_analytic_grads_tree being available in scope
         grads = compute_analytic_grads_tree(
-            model, init_modes, targ_modes, step_key, num_samples=num_samples
+            model, init_modes, targ_modes, weights, step_key, num_samples=num_samples
         )
         
         # 2. Apply Updates using Optax
@@ -303,10 +304,10 @@ def train_CNF_analytic_parallel(
 
     # --- Define Parallel Step (JIT Compiled) ---
     @eqx.filter_jit
-    def step_parallel(models, opt_states, step_keys, init_modes_batch, targ_modes_batch):
+    def step_parallel(models, opt_states, step_keys, init_modes_batch, targ_modes_batch, weights_batch):
         # We vmap over: models, opt_states, keys, and the mode batches
         return jax.vmap(train_step_analytic)(
-            models, opt_states, step_keys, init_modes_batch, targ_modes_batch
+            models, opt_states, step_keys, init_modes_batch, targ_modes_batch, weights_batch
         )
 
     # --- Training Loop ---
@@ -319,7 +320,7 @@ def train_CNF_analytic_parallel(
 
         # Perform parallel update
         models, opt_states, grads = step_parallel(
-            models, opt_states, step_keys, initial_modes_batch, target_modes_batch
+            models, opt_states, step_keys, initial_modes_batch, target_modes_batch, weights_batch
         )
 
         # --- Logging ---

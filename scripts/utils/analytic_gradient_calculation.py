@@ -84,12 +84,12 @@ def compute_analytic_gradient_2modes(W, initial_modes, target_modes, key=jax.ran
 
     return gradient
 
-def compute_analytic_gradient_Mmodes(W, initial_modes, target_modes, key=jax.random.PRNGKey(0), num_samples=10000):
+def compute_analytic_gradient_Mmodes(W, initial_modes, target_modes, weights, key=jax.random.PRNGKey(0), num_samples=10000):
     dim = W.shape[0]
     num_initial_modes = initial_modes.shape[0]
     zs = sample_multimodal_gaussian(key, means=initial_modes, 
                                     covs=jnp.tile(jnp.identity(dim), (num_initial_modes, 1, 1)), 
-                                    weights=jnp.ones(num_initial_modes), num_samples=num_samples)
+                                    weights=weights, num_samples=num_samples)
     
     # Calculate first term
     expectation_1 = jnp.identity(dim) + (initial_modes.T @ initial_modes) / num_initial_modes

@@ -255,24 +255,6 @@ def stable_rank_svd(A, eps=1e-10):
     
     return stable_rank_val
 
-def get_linear_summary_stats(W, initial_modes, target_modes, radius):
-    
-    E = jax.scipy.linalg.expm(W)
-    
-    mu_transformed = initial_modes @ E.T  # shape (k, D)
-    
-    M = (mu_transformed @ target_modes.T) / radius**2 # shape (k, k)
-    
-    S = (mu_transformed @ mu_transformed.T) / radius**2 # shape (k, k)
-
-    eta = M[:, 0] - M[:, 1]
-
-    v = E.T @ (target_modes[0].reshape((-1, 1)) - target_modes[1].reshape((-1, 1)))
-
-    rho = jnp.linalg.norm(v)**2
-
-
-    return M, S, eta, rho
 
 def get_minimum_summary_stats(W, initial_modes, target_modes, time_derivs=False):
 
